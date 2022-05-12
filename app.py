@@ -23,17 +23,17 @@ app = App(token=slack_bot_token)
 
 session_path = os.path.join(os.path.dirname(__file__), "config/chrome_session")
 
-# print('Setting up mintapi...')
-# mint = mintapi.Mint(
-#     mint_email,
-#     mint_password,
-#     mfa_method="soft-token",
-#     mfa_token=mint_mfa_token,
-#     headless=True,
-#     session_path=session_path,
-#     wait_for_sync=False,
-#     use_chromedriver_on_path="USE_CHROMEDRIVER_ON_PATH" in os.environ,
-# )
+print('Setting up mintapi...')
+mint = mintapi.Mint(
+    mint_email,
+    mint_password,
+    mfa_method="soft-token",
+    mfa_token=mint_mfa_token,
+    headless=True,
+    session_path=session_path,
+    wait_for_sync=False,
+    use_chromedriver_on_path="USE_CHROMEDRIVER_ON_PATH" in os.environ,
+)
 
 
 @app.command("/accts")
