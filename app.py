@@ -38,10 +38,22 @@ mint = mintapi.Mint(
 
 @app.command("/accts")
 def handle_accts_command(ack, respond, command):
-    print("Handling accts command...")
+    print("Handling /accts command...")
     ack()
     accounts_blocks = get_accounts_blocks()
-    respond(blocks=accounts_blocks, response_type="in_channel")
+    text = get_text_summary_for_blocks(accounts_blocks)[:3000]
+    respond(blocks=accounts_blocks, text=text, response_type="in_channel")
+
+
+@app.command("/buf")
+def handle_buf_command(ack, respond, command):
+    print("Handling /buf command...")
+    ack()
+    buf_blocks = [{
+        "type": "section", "text": get_money_buffer_element()
+    }]
+    text = get_text_summary_for_blocks(buf_blocks)[:3000]
+    respond(blocks=buf_blocks, text=text, response_type="in_channel")
 
 
 @app.event("message")
@@ -197,8 +209,35 @@ def get_accounts_blocks():
     ]
 
 
-def get_money_buffer_block():
-    pass
+def get_money_buffer_element():
+    accounts_by_class = get_accounts()
+
+    cash_value = sum(
+        map(lambda account: account['value'], accounts_by_class["bank"]))
+    credit_card_value = sum(
+        map(lambda account: account['value'], accounts_by_class["credit"]))
+    buffer_value = cash_value + credit_card_value
+
+    return {"type": "mrkdwn",
+            "text": f"Cash: {'{:.2f}'.format(cash_value)}, credit: {'{:.2f}'.format(credit_card_value)}, buffer: *{'{:.2f}'.format(buffer_value)}*"}
+
+
+def get_text_summary_for_blocks(blocks):
+    return "; ".join(filter(lambda x: x is not None, map(get_text_summary_for_block, blocks)))
+
+
+def get_text_summary_for_block(block):
+    if 'text' not in block:
+        return None
+
+    if isinstance(block['text'], str):
+        return block['text']
+    elif isinstance(block['text'], dict):
+        return get_text_summary_for_block(block['text'])
+    elif 'elements' in block and isinstance(block['elements'], list):
+        return get_text_summary_for_blocks(block['elements'])
+    else:
+        return None
 
 
 if __name__ == "__main__":
@@ -207,14 +246,22 @@ if __name__ == "__main__":
 
     while True:
         print("Checking for new transactions...")
-        txns_blocks = get_unseen_txns_blocks()
+        txn_notif_blocks = get_unseen_txns_blocks()
+
+        if len(txn_notif_blocks) > 0:
+            txn_notif_blocks.append({
+                "type": "context",
+                "elements": [get_money_buffer_element()]
+            })
 
         chunk_size = 50
-        for i in range(0, len(txns_blocks), chunk_size):
-            txns_blocks_in_chunk = txns_blocks[i: i + chunk_size]
-            print("len of blocks:", len(txns_blocks_in_chunk))
-            post_message(blocks=txns_blocks_in_chunk)
+        for i in range(0, len(txn_notif_blocks), chunk_size):
+            blocks_in_chunk = txn_notif_blocks[i: i + chunk_size]
+            print("len of blocks:", len(blocks_in_chunk))
+            text = get_text_summary_for_blocks(blocks_in_chunk)[:3000]
+            post_message(blocks=blocks_in_chunk, text=text)
 
+        print("mint.initiate_account_refresh...")
         mint.initiate_account_refresh()
 
         print("Sleeping...")
