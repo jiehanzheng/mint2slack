@@ -23,17 +23,17 @@ app = App(token=slack_bot_token)
 
 session_path = os.path.join(os.path.dirname(__file__), "config/chrome_session")
 
-print('Setting up mintapi...')
-mint = mintapi.Mint(
-    mint_email,
-    mint_password,
-    mfa_method="soft-token",
-    mfa_token=mint_mfa_token,
-    headless=True,
-    session_path=session_path,
-    wait_for_sync=False,
-    use_chromedriver_on_path="USE_CHROMEDRIVER_ON_PATH" in os.environ,
-)
+# print('Setting up mintapi...')
+# mint = mintapi.Mint(
+#     mint_email,
+#     mint_password,
+#     mfa_method="soft-token",
+#     mfa_token=mint_mfa_token,
+#     headless=True,
+#     session_path=session_path,
+#     wait_for_sync=False,
+#     use_chromedriver_on_path="USE_CHROMEDRIVER_ON_PATH" in os.environ,
+# )
 
 
 @app.command("/accts")
@@ -227,12 +227,9 @@ def get_text_summary_for_blocks(blocks):
 
 
 def get_text_summary_for_block(block):
-    if 'text' not in block:
-        return None
-
-    if isinstance(block['text'], str):
+    if 'text' in block and isinstance(block['text'], str):
         return block['text']
-    elif isinstance(block['text'], dict):
+    elif 'text' in block and isinstance(block['text'], dict):
         return get_text_summary_for_block(block['text'])
     elif 'elements' in block and isinstance(block['elements'], list):
         return get_text_summary_for_blocks(block['elements'])
