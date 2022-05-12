@@ -144,8 +144,7 @@ def get_accounts():
     account_data = mint.get_accounts()
 
     account_data = filter(
-        lambda account: account["isActive"]
-        and (account["value"] < 0 or account["value"] >= 1),
+        lambda account: account["isActive"],
         account_data,
     )
 
