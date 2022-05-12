@@ -8,7 +8,7 @@ import datetime
 from datetime import datetime, timedelta
 import time
 
-
+print('Opening secret files...')
 with open("secrets/slack_bot_token.txt") as slack_bot_token_f, open("secrets/slack_app_token.txt") as slack_app_token_f, open("secrets/mint_email.txt") as mint_email_f, open("secrets/mint_password.txt") as mint_password_f, open("secrets/mint_mfa_token.txt") as mint_mfa_token_f:
     slack_bot_token = slack_bot_token_f.read()
     slack_app_token = slack_app_token_f.read()
@@ -18,10 +18,12 @@ with open("secrets/slack_bot_token.txt") as slack_bot_token_f, open("secrets/sla
 
 txnsdb = TinyDB("config/txns.json")
 
+print('Init Slack app...')
 app = App(token=slack_bot_token)
 
 session_path = os.path.join(os.path.dirname(__file__), "config/chrome_session")
 
+print('Setting up mintapi...')
 mint = mintapi.Mint(
     mint_email,
     mint_password,
@@ -201,6 +203,7 @@ def get_money_buffer_block():
 
 
 if __name__ == "__main__":
+    print('Init Slack SocketModeHandler...')
     SocketModeHandler(app, slack_app_token).connect()
 
     while True:

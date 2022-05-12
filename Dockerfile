@@ -5,5 +5,6 @@ WORKDIR /app
 RUN pip3 install -r requirements.txt
 
 ENV USE_CHROMEDRIVER_ON_PATH=1
+ENV PYTHONUNBUFFERED=1
 
 CMD [ "python3", "/app/app.py" ]
