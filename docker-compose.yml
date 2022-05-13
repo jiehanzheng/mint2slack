@@ -7,6 +7,8 @@ services:
     volumes:
       - ./secrets:/app/secrets:ro
       - ./config:/app/config
+    environment:
+      - MINTAPI_USE_BETA_HOST=1
     logging:
       driver: "json-file"
       options:

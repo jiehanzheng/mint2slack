@@ -33,6 +33,7 @@ mint = mintapi.Mint(
     session_path=session_path,
     wait_for_sync=False,
     use_chromedriver_on_path="USE_CHROMEDRIVER_ON_PATH" in os.environ,
+    beta="MINTAPI_USE_BETA_HOST" in os.environ,
 )
 
 
@@ -90,8 +91,10 @@ def download_and_persist_and_get_unseen_txns():
         datetime.today() - timedelta(days=14)).strftime("%m/%d/%y")
     fetch_end_mmddyy = datetime.today().strftime("%m/%d/%y")
 
-    api_txns_unsanitized = mint.get_transactions_json(
-        start_date=fetch_start_mmddyy, end_date=fetch_end_mmddyy
+    api_txns_unsanitized = mint.get_transaction_data(
+        start_date=fetch_start_mmddyy,
+        end_date=fetch_end_mmddyy,
+        remove_pending=False
     )
 
     unseen_txns_from_api = []
@@ -167,7 +170,7 @@ def get_unseen_txns_blocks():
 
 
 def get_accounts():
-    account_data = mint.get_accounts()
+    account_data = mint.get_account_data()
 
     account_data = filter(
         lambda account: account["isActive"],

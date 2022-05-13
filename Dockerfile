@@ -1,8 +1,21 @@
-FROM ghcr.io/mintapi/mintapi@sha256:b1ead691fa28662bd8f7063fbc79c3851ba07d8eb03336630b6a802c224453e5
+FROM selenium/standalone-chrome
+
+# add mintapi to path
+ENV PATH=$HOME/.local/bin:$PATH
+
+RUN echo "**** install packages ****" && \
+    sudo apt-get update && \
+    sudo apt-get install -y python3-pip && \
+    pip3 install https://github.com/jiehanzheng/mintapi/archive/refs/heads/feature/support-beta.tar.gz && \
+    echo "**** cleanup ****" && \
+    sudo apt-get clean && \
+    sudo rm -rf \
+    /tmp/* \
+    /var/lib/apt/lists/* \
+    /var/tmp/*
 
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip3 install -r requirements.txt
+RUN pip3 install 'slack_bolt~=1.13.2' 'tinydb~=4.7.0'
 COPY app.py ./
 
 ENV USE_CHROMEDRIVER_ON_PATH=1
