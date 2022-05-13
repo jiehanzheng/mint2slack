@@ -176,6 +176,7 @@ def get_unseen_txns_blocks():
 
 
 def download_accounts():
+    print("Downloading accounts...")
     api_accounts_unsanitized = mint.get_account_data()
 
     for api_account_unsanitized in api_accounts_unsanitized:
@@ -194,6 +195,7 @@ def download_accounts():
 
 
 def get_active_accounts_by_type():
+    download_accounts()
     active_accounts = accountsdb.search(Account.is_active == True)
 
     accounts_by_type = defaultdict(list)
@@ -274,7 +276,6 @@ def get_text_summary_for_block(block):
 
 
 if __name__ == "__main__":
-    print("Downloading accounts...")
     download_accounts()
 
     print('Init Slack SocketModeHandler...')
