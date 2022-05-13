@@ -61,6 +61,20 @@ def handle_message_events(body, logger):
     pass
 
 
+@app.error
+def custom_error_handler(error, respond, body, logger):
+    try:
+        respond(
+            text=f"Sorry, an error occurred.  I'm going to restart myself now and please try again later.", response_type="in_channel")
+        respond(text=f"The error was: {str(error)}",
+                response_type="in_channel")
+    except:
+        print("An error occurred while handling another error")
+    finally:
+        print(error)
+        os._exit(1)
+
+
 def post_message(*args, **kwargs):
     result = app.client.conversations_list()
     for channel in result["channels"]:
