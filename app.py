@@ -2,6 +2,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 import mintapi
 from tinydb import TinyDB, Query
+from tinydb.storages import MemoryStorage
 import os
 from collections import defaultdict
 import datetime
@@ -16,7 +17,11 @@ with open("secrets/slack_bot_token.txt") as slack_bot_token_f, open("secrets/sla
     mint_password = mint_password_f.read()
     mint_mfa_token = mint_mfa_token_f.read()
 
-txnsdb = TinyDB("config/txns.json")
+accountsdb = TinyDB(storage=MemoryStorage)
+Account = Query()
+
+txnsdb = TinyDB("config/txns_v2.json")
+Txn = Query()
 
 print('Init Slack app...')
 app = App(token=slack_bot_token)
@@ -97,39 +102,40 @@ def download_and_persist_and_get_unseen_txns():
         remove_pending=False
     )
 
-    unseen_txns_from_api = []
-    allowed_keys = set(
-        ["id", "date", "fi", "account", "isPending", "merchant", "amount"]
-    )
+    unseen_txns = []
     for api_txn_unsanitized in api_txns_unsanitized:
-        api_txn = {
-            allowed_key: api_txn_unsanitized[allowed_key]
-            for allowed_key in allowed_keys
+        txn = {
+            'id': api_txn_unsanitized['id'],
+            'account_id': api_txn_unsanitized['accountId'],
+            'date': api_txn_unsanitized['date'],
+            'description_from_fi':  api_txn_unsanitized['fiData']['description'],
+            'amount':  api_txn_unsanitized['fiData']['amount'],
+            'is_pending': api_txn_unsanitized['isPending'],
         }
 
-        Txn = Query()
-        seen_txns = txnsdb.search(Txn.id == api_txn["id"])
-
-        if len(seen_txns) > 0:
+        if txnsdb.contains(Txn.id == txn["id"]):
+            txnsdb.update(txn, Txn.id == txn['id'])
             continue
 
-        unseen_txns_from_api.append(api_txn)
-        txnsdb.insert(api_txn)
+        unseen_txns.append(txn)
+        txnsdb.insert(txn)
 
-    print(f"Found {len(unseen_txns_from_api)} new transactions")
+    print(f"Found {len(unseen_txns)} new transactions")
 
-    return unseen_txns_from_api
+    return unseen_txns
 
 
 def get_unseen_txns_blocks():
     unseen_txns = download_and_persist_and_get_unseen_txns()
 
     def get_txn_section_block(txn):
+        account = accountsdb.get(Account.id == txn['account_id'])
+
         return {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{txn['merchant']}* — {txn['amount']}{' (pending)' if txn['isPending'] else ''}",
+                "text": f"*{txn['description_from_fi']}* — {txn['amount']}{' (pending)' if txn['is_pending'] else ''}",
             },
             "accessory": {
                 "type": "overflow",
@@ -137,14 +143,14 @@ def get_unseen_txns_blocks():
                     {
                         "text": {
                             "type": "plain_text",
-                            "text": txn["fi"],
+                            "text": account['fi_name'],
                         },
                         "value": "fi",
                     },
                     {
                         "text": {
                             "type": "plain_text",
-                            "text": txn["account"],
+                            "text": account['name'],
                         },
                         "value": "account",
                     },
@@ -169,23 +175,36 @@ def get_unseen_txns_blocks():
     return list(map(get_txn_section_block, unseen_txns))
 
 
-def get_accounts():
-    account_data = mint.get_account_data()
+def download_accounts():
+    api_accounts_unsanitized = mint.get_account_data()
 
-    account_data = filter(
-        lambda account: account["isActive"],
-        account_data,
-    )
+    for api_account_unsanitized in api_accounts_unsanitized:
+        account = {
+            'id': api_account_unsanitized['id'],
+            'type': api_account_unsanitized['type'],
+            'name': api_account_unsanitized['name'],
+            'value': api_account_unsanitized['value'],
+            'currency': api_account_unsanitized['currency'],
+            'fi_name': api_account_unsanitized['fiName'],
+            'is_active': api_account_unsanitized['isActive'],
+            'created_at': api_account_unsanitized['createdDate'],
+            'updated_at': api_account_unsanitized['lastUpdatedDate'],
+        }
+        accountsdb.upsert(account, Account.id == account['id'])
 
-    accounts_by_class = defaultdict(list)
-    for account in account_data:
-        accounts_by_class[account["klass"]].append(account)
 
-    return accounts_by_class
+def get_active_accounts_by_type():
+    active_accounts = accountsdb.search(Account.is_active == True)
+
+    accounts_by_type = defaultdict(list)
+    for account in active_accounts:
+        accounts_by_type[account['type']].append(account)
+
+    return accounts_by_type
 
 
 def get_accounts_blocks():
-    accounts_by_class = get_accounts()
+    accounts_by_class = get_active_accounts_by_type()
 
     def without_low_balance_accounts(accounts):
         return filter(
@@ -196,7 +215,7 @@ def get_accounts_blocks():
     def get_accounts_section_block(accounts):
         text = "\n".join(
             map(
-                lambda account: f"{account['fiName']} {account['name']} — {account['currency']} {'{:.2f}'.format(account['value'])}",
+                lambda account: f"{account['fi_name']} {account['name']} — {account['currency']} {'{:.2f}'.format(account['value'])}",
                 accounts,
             )
         )
@@ -207,7 +226,7 @@ def get_accounts_blocks():
         "text": {"type": "plain_text", "text": "Credit cards"},
     }
     credit_cards_block = get_accounts_section_block(
-        without_low_balance_accounts(accounts_by_class["credit"])
+        without_low_balance_accounts(accounts_by_class['CreditAccount'])
     )
 
     bank_accounts_header = {
@@ -215,7 +234,7 @@ def get_accounts_blocks():
         "text": {"type": "plain_text", "text": "Bank accounts"},
     }
     bank_accounts_block = get_accounts_section_block(
-        without_low_balance_accounts(accounts_by_class["bank"])
+        without_low_balance_accounts(accounts_by_class["BankAccount"])
     )
 
     return [
@@ -227,12 +246,12 @@ def get_accounts_blocks():
 
 
 def get_money_buffer_element():
-    accounts_by_class = get_accounts()
+    accounts_by_class = get_active_accounts_by_type()
 
     cash_value = sum(
-        map(lambda account: account['value'], accounts_by_class["bank"]))
+        map(lambda account: account['value'], accounts_by_class["BankAccount"]))
     credit_card_value = sum(
-        map(lambda account: account['value'], accounts_by_class["credit"]))
+        map(lambda account: account['value'], accounts_by_class["CreditAccount"]))
     buffer_value = cash_value + credit_card_value
 
     return {"type": "mrkdwn",
@@ -255,6 +274,9 @@ def get_text_summary_for_block(block):
 
 
 if __name__ == "__main__":
+    print("Downloading accounts...")
+    download_accounts()
+
     print('Init Slack SocketModeHandler...')
     SocketModeHandler(app, slack_app_token).connect()
 
