@@ -135,7 +135,7 @@ def get_unseen_txns_blocks():
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*{txn['description_from_fi']}* — {txn['amount']}{' (pending)' if txn['is_pending'] else ''}",
+                "text": f"*{txn['description_from_fi']}* — {'{:.2f}'.format(txn['amount'])}{' (pending)' if txn['is_pending'] else ''}",
             },
             "accessory": {
                 "type": "overflow",
